@@ -1,0 +1,38 @@
+--- a/src/mame/sega/model2_v.cpp
++++ b/src/mame/sega/model2_v.cpp
+@@ -90,6 +90,7 @@
+ 
+ #include "emu.h"
+ #include "vcop2/native_timing.h"
++#include "vcop2/native_clip.h"
+ #include "model2.h"
+ #include "model2rd.ipp"
+ #include "../../lib/vcop2/model2_trace.h"
+@@ -475,21 +476,12 @@
+ 
+ 	if (cull == false)
+ 	{
+-		int32_t clipped_verts;
+-		poly_vertex verts_in[8], verts_out[8];
+-
+-		for (int i = 0; i < NumVerts; i++)
+-			verts_in[i] = object.v[i];
+-
+-		clipped_verts = NumVerts;
+-
+-		/* do clipping */
+-		for (int i = 0; i < 4; i++)
+-		{
+-			clipped_verts = clip_polygon(verts_in, clipped_verts, verts_out, raster->clip_plane[raster->center_sel][i]);
+-			for (int j = 0; j < clipped_verts; j++)
+-				verts_in[j] = verts_out[j];
+-		}
++		poly_vertex verts_out[8];
++		// Preserve the original four-plane clipper for every mixed case. A
++		// wholly accepted polygon only needs the same final vertex copies.
++		static const bool fast_clip = std::getenv("VCOP2_NO_CLIP_FASTPATH") == nullptr;
++		const int32_t clipped_verts = vcop2::clip_polygon_frustum<NumVerts>(
++			object.v, verts_out, raster->clip_plane[raster->center_sel], dot_product, clip_polygon, fast_clip);
+ 
+ 		if (clipped_verts > 2)
+ 		{

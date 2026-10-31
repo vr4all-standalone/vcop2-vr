@@ -1,0 +1,13 @@
+--- a/src/mame/sega/model2_v.cpp
++++ b/src/mame/sega/model2_v.cpp
+@@ -2500,7 +2500,9 @@
+ 	/* tell the rasterizer we're starting a frame */
+ 	if (m_render_test_mode == true)
+ 		draw_framebuffer(bitmap, cliprect);
+-	else
++	else if(!vcop2::vr_requested() || std::getenv("VCOP2_CPU_RASTER") || std::getenv("VCOP2_SCENE_DIR"))
++        // The VR host replays owned polygons. Retain the software rasterizer
++        // for reference diagnostics; it does not participate in game logic.
+ 		render_polygons(bitmap, cliprect);
+ 
+ 	m_sys24_bitmap.fill(0, cliprect);

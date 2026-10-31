@@ -1,0 +1,15 @@
+--- a/src/osd/modules/sound/sdl_sound.cpp
++++ b/src/osd/modules/sound/sdl_sound.cpp
+@@ -266,5 +266,12 @@
+ 			(generated-stream->m_report_generated)/seconds, (consumed-stream->m_report_consumed)/seconds,
+ 			static_cast<unsigned long long>(missing-stream->m_report_missing), queued, stream->m_rate);
++		if(const char *path=std::getenv("VCOP2_XR_LOG")) {
++			std::ofstream out(std::string(path)+".audio",std::ios::app);
++			out<<"Audio generated "<<(generated-stream->m_report_generated)/seconds
++			   <<" Hz, consumed "<<(consumed-stream->m_report_consumed)/seconds
++			   <<" Hz, missing "<<(missing-stream->m_report_missing)
++			   <<" frames, queued "<<queued<<", rate "<<stream->m_rate<<'\n';
++		}
+ 		stream->m_report_ms = now; stream->m_report_generated = generated;
+ 		stream->m_report_consumed = consumed; stream->m_report_missing = missing;
+ 	}

@@ -1,0 +1,11 @@
+--- a/src/mame/sega/model2.cpp
++++ b/src/mame/sega/model2.cpp
+@@ -2443,7 +2443,7 @@
+ 	if (!state)
+ 		return;
+ 
+-    vcop2::native_tick([&](uint32_t address){return m_maincpu->space(AS_PROGRAM).read_dword(address);});
++    vcop2::native_tick([&](uint32_t address){return m_maincpu->space(AS_PROGRAM).read_dword(address);},m_videocontrol);
+     if(vcop2::vr_requested()) {
+         const auto* poly=reinterpret_cast<const uint32_t*>(memregion("polygons")->base());
+         const auto* tex=reinterpret_cast<const uint16_t*>(memregion("textures")->base());

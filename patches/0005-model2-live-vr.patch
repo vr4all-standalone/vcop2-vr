@@ -1,0 +1,182 @@
+--- a/src/mame/sega/model2_v.cpp
++++ b/src/mame/sega/model2_v.cpp
+@@ -92,6 +92,7 @@
+ #include "model2.h"
+ #include "model2rd.ipp"
+ #include "../../lib/vcop2/model2_trace.h"
++#include "../../lib/vcop2/model2_live.h"
+ 
+ #include "corefloat.h"
+ 
+@@ -452,7 +453,7 @@
+ 	}
+ 
+ 	raster->polygon_z = zvalue;
+-    if (vcop2::trace_active()) {
++    if (vcop2::trace_active() || vcop2::live_active()) {
+         vcop2::NativePolygon native;
+         native.count=NumVerts;native.attr=attr;native.window=raster->cur_window;
+         native.sort=float_to_zval(zvalue,raster->z_adjust);native.luma=object.luma;
+@@ -462,7 +463,8 @@
+         for(unsigned i=0;i<4;i++){native.header[i]=object.texheader[i];native.viewport[i]=raster->viewport[i];}
+         for(unsigned i=0;i<12;i++)native.matrix[i]=m_geo->matrix[i];
+         for(unsigned i=0;i<NumVerts;i++){const auto& v=object.v[i];native.vertices[i]={v.x,v.y,v.p[0],v.p[1],v.p[2]};}
+-        vcop2::trace_capture().append(native);
++        if(vcop2::trace_active())vcop2::trace_capture().append(native);
++        if(vcop2::live_active())vcop2::live_capture().append(native);
+     }
+ 
+ 	if (cull == false)
+@@ -681,6 +683,7 @@
+ {
+     if (std::string_view(machine().system().name) == "vcop2") {
+         vcop2::trace_begin(m_screen->frame_number(), machine().time().as_double());
++        vcop2::live_begin(m_screen->frame_number(), machine().time().as_double());
+     }
+ 	raster_state *raster = m_raster.get();
+ 
+@@ -1735,7 +1738,7 @@
+ 	u32  tha = *input++;     /* Texture Header Address */
+ 	u32  oba = *input++;     /* Object Address */
+ 	u32  obc = *input++;     /* Object Count */
+-	if(vcop2::trace_active())vcop2::trace_object()=oba;
++	if(vcop2::trace_active()||vcop2::live_active())vcop2::trace_object()=oba;
+ 
+ 	u32 *obp;                /* Object Pointer */
+ 
+@@ -1788,7 +1791,7 @@
+ /* Command 02: Direct Data */
+ u32 *model2_state::geo_direct_data(geo_state *geo, u32 opcode, u32 *input)
+ {
+-    if(vcop2::trace_active())vcop2::trace_object()=0xffffffff;
++    if(vcop2::trace_active()||vcop2::live_active())vcop2::trace_object()=0xffffffff;
+ 	raster_state *raster = geo->raster;
+ 	u32  tpa = *input++;     /* Texture Point Address */
+ 	u32  tha = *input++;     /* Texture Header Address */
+@@ -2374,6 +2377,7 @@
+ 		/* process it */
+ 		input = geo_process_command(m_geo.get(), opcode, input, &end_code);
+ 	}
++    if(vcop2::live_active()){vcop2::live_pending()=true;vcop2::live_active()=false;}
+     if(vcop2::trace_active()) {
+         vcop2::trace_geometry_pending()=true;
+         vcop2::trace_active()=false;
+@@ -2478,6 +2482,21 @@
+         try {vcop2::trace_raster("background",m_screen->visible_area().width(),m_screen->visible_area().height(),[&](int x,int y){return uint32_t(bitmap.pix(y,x));});}
+         catch(const std::exception& error){osd_printf_error("VCOP2 capture failed: %s\n",error.what());}
+     }
++    if(vcop2::live_pending()) {
++        auto& capture=vcop2::live_capture();
++        const int width=m_screen->visible_area().width(),height=m_screen->visible_area().height();
++        capture.display(m_crtc_xoffset,m_crtc_yoffset,width,height);
++        capture.bytes("texture0",&m_textureram0[0],m_textureram0.bytes());
++        capture.bytes("texture1",&m_textureram1[0],m_textureram1.bytes());
++        capture.bytes("palette",m_palram.get(),0x4000);
++        capture.bytes("colorxlat",m_colorxlat.get(),0xc000);
++        capture.bytes("luma",m_lumaram.get(),0x8000);
++        capture.bytes("gamma",m_gamma_table,sizeof(m_gamma_table));
++        auto frame=std::make_unique<vcop2::NativeFrame>(capture.take());
++        frame->complete=false;
++        vcop2::copy_pixels(frame->background,width,height,[&](int x,int y){return bitmap.pix(y,x);});
++        vcop2::live_raster()=std::move(frame);vcop2::live_pending()=false;
++    }
+ 	/* tell the rasterizer we're starting a frame */
+ 	if (m_render_test_mode == true)
+ 		draw_framebuffer(bitmap, cliprect);
+@@ -2490,6 +2509,12 @@
+ 		m_tiles->draw(screen, m_sys24_bitmap, cliprect, (layer<<1) | 1, 0, 0);
+ 
+ 	copybitmap_trans(bitmap, m_sys24_bitmap, 0, 0, 0, 0, cliprect, 0);
++    if(auto& frame=vcop2::live_raster();frame) {
++        vcop2::copy_pixels(frame->foreground,frame->width,frame->height,[&](int x,int y){return m_sys24_bitmap.pix(y,x);});
++        vcop2::copy_pixels(frame->native,frame->width,frame->height,[&](int x,int y){return bitmap.pix(y,x);});
++        frame->complete=true;
++        vcop2::shared_runtime().scene.store(std::shared_ptr<const vcop2::NativeFrame>(frame.release()));
++    }
+     if(!vcop2::trace_pending_raster().empty()) {
+         try {
+             const int width=m_screen->visible_area().width(),height=m_screen->visible_area().height();
+--- a/src/mame/sega/model2.cpp
++++ b/src/mame/sega/model2.cpp
+@@ -71,6 +71,7 @@
+ 
+ #include "emu.h"
+ #include "model2.h"
++#include "../../lib/vcop2/host_bridge.h"
+ 
+ #include "315_5296.h"
+ #include "315_5649.h"
+@@ -1098,6 +1099,7 @@
+ 
+ u8 model2_state::lightgun_data_r(offs_t offset)
+ {
++    if(vcop2::vr_requested())return vcop2::lightgun_byte(offset);
+ 	u16 data = m_lightgun_ports[offset >> 1].read_safe(0);
+ 	return BIT(offset, 0) ? (data >> 8) : data;
+ }
+@@ -1118,6 +1120,7 @@
+ // handles offscreen gun trigger detection here
+ u8 model2_state::lightgun_offscreen_r(offs_t offset)
+ {
++    if(vcop2::vr_requested())return vcop2::offscreen_input(offset,0xff);
+ 	// 5 percent border size
+ 	const float BORDER_SIZE = 0.05f;
+ 
+@@ -1568,7 +1571,7 @@
+ 
+ u8 model2_state::in0_r()
+ {
+-	u8 data = m_in0->read();
++	u8 data = vcop2::system_input(m_in0->read());
+ 
+ 	if (m_ctrlmode)
+ 		return (0xc0) | (m_eeprom->do_read() << 5) | (0x10) | (data & 0x0f);
+@@ -2422,6 +2425,14 @@
+ 	if (!state)
+ 		return;
+ 
++    vcop2::native_tick([&](uint32_t address){return m_maincpu->space(AS_PROGRAM).read_dword(address);});
++    if(vcop2::vr_requested()) {
++        const auto* poly=reinterpret_cast<const uint32_t*>(memregion("polygons")->base());
++        const auto* tex=reinterpret_cast<const uint16_t*>(memregion("textures")->base());
++        vcop2::native_weapons([&](uint32_t address){return m_maincpu->space(AS_PROGRAM).read_dword(address);},
++            [&](uint32_t index){return poly[index];},[&](uint32_t index){return tex[index];},
++            memregion("polygons")->bytes()/4,memregion("textures")->bytes()/2);
++    }
+ 	m_framenum = m_screen->frame_number();
+ 
+ 	// if 60 Hz mode or frame number is even, trigger geometrizer to start new frame
+@@ -2789,6 +2800,7 @@
+ 	sega_315_5649_device &io(*subdevice<sega_315_5649_device>("io"));
+ 	io.serial_ch2_rd_callback().set(FUNC(model2a_state::lightgun_mux_r));
+ 	io.serial_ch2_wr_callback().set(FUNC(model2a_state::lightgun_mux_w));
++    io.in_pc_callback().set([this](){return vcop2::trigger_input(ioport("IN1")->read());});
+ }
+ 
+ void model2a_state::skytargt(machine_config &config)
+--- a/src/osd/modules/lib/osdobj_common.cpp
++++ b/src/osd/modules/lib/osdobj_common.cpp
+@@ -25,6 +25,7 @@
+ #include "watchdog.h"
+ 
+ #include "emu.h"
++#include "vcop2/host_bridge.h"
+ #include "../frontend/mame/ui/menuitem.h"
+ 
+ #include <iostream>
+@@ -463,6 +464,7 @@
+ 
+ void osd_common_t::update(bool skip_redraw)
+ {
++    vcop2::poll_host(machine());
+ 	//
+ 	// This method is called periodically to flush video updates to the
+ 	// screen, and also to allow the OSD a chance to update other systems
+@@ -794,6 +796,7 @@
+ 
+ void osd_common_t::osd_exit()
+ {
++    vcop2::stop_host();
+ 	// destroy the renderers before shutting down their parent module
+ 	for (auto it = window_list().rbegin(); window_list().rend() != it; ++it)
+ 		(*it)->renderer_reset();

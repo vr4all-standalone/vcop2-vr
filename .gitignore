@@ -1,0 +1,8 @@
+/private/
+/research/
+/build/
+/artifacts/
+/engine/
+/.superpowers/
+__pycache__/
+*.pyc

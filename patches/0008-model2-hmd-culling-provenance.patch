@@ -1,0 +1,23 @@
+--- a/src/mame/sega/model2_v.cpp
++++ b/src/mame/sega/model2_v.cpp
+@@ -458,6 +458,11 @@
+         native.count=NumVerts;native.attr=attr;native.window=raster->cur_window;
+         native.sort=float_to_zval(zvalue,raster->z_adjust);native.luma=object.luma;
+         native.lod=object.texlod;native.culled=cull;native.object=vcop2::trace_object();
++        native.cull_reasons=vcop2::CullKnown;
++        if(((attr>>17)&1)==0 && (raster->command_buffer[9]&0x00800000))native.cull_reasons|=vcop2::CullBackface;
++        if(((attr>>8)&3)==0)native.cull_reasons|=vcop2::CullNonRendering;
++        if(raster->master_z_clip!=0xff && int32_t(1.0/min_z)>raster->master_z_clip)native.cull_reasons|=vcop2::CullDepthLimit;
++        if(max_z<0)native.cull_reasons|=vcop2::CullBehind;
+         native.focus={m_geo->focus.x,m_geo->focus.y};
+         native.center={float(raster->center[raster->center_sel][0]),float(raster->center[raster->center_sel][1])};
+         for(unsigned i=0;i<4;i++){native.header[i]=object.texheader[i];native.viewport[i]=raster->viewport[i];}
+@@ -2493,7 +2498,7 @@
+         capture.bytes("luma",m_lumaram.get(),0x8000);
+         capture.bytes("gamma",m_gamma_table,sizeof(m_gamma_table));
+         auto frame=std::make_unique<vcop2::NativeFrame>(capture.take());
+-        frame->complete=false;
++        frame->complete=false;frame->raster_only=m_render_test_mode;
+         vcop2::copy_pixels(frame->background,width,height,[&](int x,int y){return bitmap.pix(y,x);});
+         vcop2::live_raster()=std::move(frame);vcop2::live_pending()=false;
+     }

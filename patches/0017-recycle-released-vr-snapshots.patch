@@ -1,0 +1,11 @@
+--- a/src/mame/sega/model2_v.cpp
++++ b/src/mame/sega/model2_v.cpp
+@@ -2553,7 +2553,7 @@
+         {vcop2::NativeTimingScope raster_timing(vcop2::NativeSection::RasterCopies);vcop2::copy_pixels(frame->foreground,frame->width,frame->height,[&](int x,int y){return m_sys24_bitmap.pix(y,x);});}
+         {vcop2::NativeTimingScope raster_timing(vcop2::NativeSection::RasterCopies);vcop2::copy_pixels(frame->native,frame->width,frame->height,[&](int x,int y){return bitmap.pix(y,x);});}
+         frame->complete=true;
+-        vcop2::shared_runtime().scene.store(std::shared_ptr<const vcop2::NativeFrame>(frame.release()));
++        vcop2::shared_runtime().scene.store(vcop2::publish_live_frame(std::move(frame)));
+     }
+     if(!vcop2::trace_pending_raster().empty()) {
+         try {

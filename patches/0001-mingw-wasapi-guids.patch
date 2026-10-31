@@ -1,0 +1,29 @@
+diff --git a/scripts/src/osd/windows.lua b/scripts/src/osd/windows.lua
+index 13f2b83f..bf40101a 100644
+--- a/scripts/src/osd/windows.lua
++++ b/scripts/src/osd/windows.lua
+@@ -42,6 +42,7 @@ function maintargetosdoptions(_target,_subtarget)
+ 		"comctl32",
+ 		"comdlg32",
+ 		"dinput8",
++		"ksuser",
+ 		"ole32",
+ 		"psapi",
+ 		"shcore",
+diff --git a/src/osd/modules/sound/wasapi_sound.cpp b/src/osd/modules/sound/wasapi_sound.cpp
+index 1c0fdd38..8dd7a0dc 100644
+--- a/src/osd/modules/sound/wasapi_sound.cpp
++++ b/src/osd/modules/sound/wasapi_sound.cpp
+@@ -12,6 +12,12 @@
+ 
+ #if defined(OSD_WINDOWS) | defined(SDLMAME_WIN32)
+ 
++// MinGW's UUID import library omits these WASAPI property keys on some releases.
++// Instantiate the SDK's select-any GUID definitions in this translation unit.
++#if defined(__MINGW32__)
++#include <initguid.h>
++#endif
++
+ // local headers
+ #include "mmdevice_helpers.h"
+ 

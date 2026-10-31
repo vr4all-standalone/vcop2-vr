@@ -1,0 +1,35 @@
+diff --git a/scripts/src/osd/sdl.lua b/scripts/src/osd/sdl.lua
+index a53b7fe8..b7e926f6 100644
+--- a/scripts/src/osd/sdl.lua
++++ b/scripts/src/osd/sdl.lua
+@@ -265,9 +265,14 @@ if BASE_TARGETOS=="unix" then
+ 				"/usr/openwin/lib",
+ 			}
+ 		end
+-		local str = backtick(sdlconfigcmd() .. " --libs")
+-		addlibfromstring(str)
+-		addoptionsfromstring(str)
++		if _OPTIONS["targetos"]=="android" then
++			libdirs { path.join(_OPTIONS["SDL_INSTALL_ROOT"], "lib") }
++			links { "SDL2" }
++		else
++			local str = backtick(sdlconfigcmd() .. " --libs")
++			addlibfromstring(str)
++			addoptionsfromstring(str)
++		end
+ 
+ 		if _OPTIONS["targetos"]~="haiku" and _OPTIONS["targetos"]~="android" then
+ 			links {
+diff --git a/scripts/src/osd/sdl_cfg.lua b/scripts/src/osd/sdl_cfg.lua
+index a5f0d79e..a591b2b4 100644
+--- a/scripts/src/osd/sdl_cfg.lua
++++ b/scripts/src/osd/sdl_cfg.lua
+@@ -109,7 +109,7 @@ if BASE_TARGETOS=="unix" then
+ 		end
+ 	elseif _OPTIONS["targetos"]=="android" then
+ 		buildoptions {
+-			backtick(sdlconfigcmd() .. " --cflags | sed 's:/SDL2::'"),
++			"-I" .. path.join(_OPTIONS["SDL_INSTALL_ROOT"], "include"),
+ 		}
+ 	else
+ 		buildoptions {

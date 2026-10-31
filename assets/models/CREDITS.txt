@@ -1,0 +1,29 @@
+This app includes the following third-party 3D models. They were not made by the app's authors.
+
+"Namco Arcade Gun" by Martoscar
+  File: guns/namco.glb
+  Licence: CC BY 4.0
+  Link: https://sketchfab.com/3d-models/namco-arcade-gun-15fbd5b9add94a34b5c21746e3dd32be
+  Changes: converted to GLB, textures resized
+
+"Nintendo Zapper" by BIGDOGLOBAL (bdglobal)
+  File: guns/zapper.glb
+  Licence: CC BY-ND 4.0
+  Link: https://sketchfab.com/3d-models/nintendo-zapper-e2a445cbf957439ab3a3f0c0408cd422
+  Changes: converted to GLB, scaled to real size and textures downsized to 1024x1024 (technical changes only), otherwise unmodified
+
+"Meta Quest Left Controller" by declan02530
+  File: controllers/left.glb
+  Licence: CC BY 4.0
+  Link: https://sketchfab.com/3d-models/meta-quest-left-controller-c70d4a544ddf4b5d8155c2edaff6f9de
+  Changes: converted to GLB, battery indicator removed
+
+"Meta Quest Right Controller" by declan02530
+  File: controllers/right.glb
+  Licence: CC BY 4.0
+  Link: https://sketchfab.com/3d-models/meta-quest-right-controller-5221accf9c7842eb9b2d4df2d2e5c545
+  Changes: converted to GLB, battery indicator removed
+
+Licences:
+  CC BY 4.0: https://creativecommons.org/licenses/by/4.0/
+  CC BY-ND 4.0: https://creativecommons.org/licenses/by-nd/4.0/

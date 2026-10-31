@@ -1,0 +1,98 @@
+--- a/src/devices/cpu/i960/i960.cpp
++++ b/src/devices/cpu/i960/i960.cpp
+@@ -1,6 +1,7 @@
+ // license:BSD-3-Clause
+ // copyright-holders:Farfetch'd, R. Belmont
+ #include "emu.h"
++#include "vcop2/native_timing.h"
+ #include "i960.h"
+ #include "i960dis.h"
+ 
+@@ -2205,6 +2206,7 @@
+ 
+ void i960_cpu_device::execute_run()
+ {
++    vcop2::NativeTimingScope native_timing(vcop2::NativeSection::I960);
+ 	uint32_t opcode;
+ 
+ 	// delay checking irqs if we are in burst stall mode
+--- a/src/devices/cpu/mb86233/mb86233.cpp
++++ b/src/devices/cpu/mb86233/mb86233.cpp
+@@ -2,6 +2,7 @@
+ // copyright-holders:Olivier Galibert
+ 
+ #include "emu.h"
++#include "vcop2/native_timing.h"
+ #include "mb86233.h"
+ #include "mb86233d.h"
+ 
+@@ -725,6 +726,7 @@
+ 
+ void mb86233_device::execute_run()
+ {
++    vcop2::NativeTimingScope native_timing(vcop2::NativeSection::GeometryDSP);
+ 	while(m_icount > 0) {
+ 		m_ppc = m_pc;
+ 		debugger_instruction_hook(m_ppc);
+--- a/src/devices/cpu/m68000/m68000.cpp
++++ b/src/devices/cpu/m68000/m68000.cpp
+@@ -2,6 +2,7 @@
+ // copyright-holders:Olivier Galibert
+ 
+ #include "emu.h"
++#include "vcop2/native_timing.h"
+ #include "m68000.h"
+ #include "m68kdasm.h"
+ 
+@@ -146,6 +147,7 @@
+ 
+ void m68000_device::execute_run()
+ {
++    vcop2::NativeTimingScope native_timing(vcop2::NativeSection::SoundCPU);
+ 	m_icount -= m_count_before_instruction_step;
+ 	if(m_icount < 0) {
+ 		m_count_before_instruction_step = -m_icount;
+--- a/src/devices/sound/scsp.cpp
++++ b/src/devices/sound/scsp.cpp
+@@ -32,6 +32,7 @@
+ 
+ // TODO : Envelope/LFO times are based on 44100Hz case?
+ #include "emu.h"
++#include "vcop2/native_timing.h"
+ #include "scsp.h"
+ 
+ #include <algorithm>
+@@ -327,6 +328,7 @@
+ 
+ void scsp_device::sound_stream_update(sound_stream &stream)
+ {
++    vcop2::NativeTimingScope native_timing(vcop2::NativeSection::SCSP);
+ 	DoMasterSamples(stream);
+ 
+ 	// MSLC     |  CA   |SGC|EG
+--- a/src/mame/sega/model2_v.cpp
++++ b/src/mame/sega/model2_v.cpp
+@@ -89,6 +89,7 @@
+ *********************************************************************************************************************************/
+ 
+ #include "emu.h"
++#include "vcop2/native_timing.h"
+ #include "model2.h"
+ #include "model2rd.ipp"
+ #include "../../lib/vcop2/model2_trace.h"
+@@ -2352,6 +2353,7 @@
+ 
+ void model2_state::geo_parse()
+ {
++    vcop2::NativeTimingScope native_timing(vcop2::NativeSection::GeometryParse);
+ 	u32  address = (m_geo_read_start_address & 0x1ffff)/4;
+ 	u32 *input = &m_bufferram[address];
+ 	u32  opcode;
+@@ -2437,6 +2439,7 @@
+ 
+ u32 model2_state::screen_update(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect)
+ {
++    vcop2::NativeTimingScope native_timing(vcop2::NativeSection::ScreenUpdate);
+ 	// if the scroll color table was written to, we need to refresh the palette
+ 	if (m_palette_dirty)
+ 	{

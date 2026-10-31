@@ -1,0 +1,13 @@
+diff --git a/makefile b/makefile
+index fe983b80..f52b3ca5 100644
+--- a/makefile
++++ b/makefile
+@@ -1197,7 +1197,7 @@ android-arm: android-ndk generate $(PROJECTDIR_SDL)/$(MAKETYPE)-android-arm/Make
+ #-------------------------------------------------
+ 
+ $(PROJECTDIR_SDL)/$(MAKETYPE)-android-arm64/Makefile: makefile $(SCRIPTS) $(GENIE)
+-	$(SILENT) $(GENIE) $(PARAMS) --gcc=android-arm64 --gcc_version=$(CLANG_VERSION) --osd=sdl --targetos=android --PLATFORM=arm64 --NOASM=1 $(MAKETYPE)
++	$(SILENT) $(GENIE) $(PARAMS) --gcc=android-arm64 --gcc_version=$(CLANG_VERSION) --osd=sdl --targetos=android --PLATFORM=arm64 --NOASM=0 $(MAKETYPE)
+ 
+ .PHONY: android-arm64
+ android-arm64: android-ndk generate $(PROJECTDIR_SDL)/$(MAKETYPE)-android-arm64/Makefile

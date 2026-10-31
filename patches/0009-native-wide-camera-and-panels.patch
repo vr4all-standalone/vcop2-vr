@@ -1,0 +1,43 @@
+--- a/src/mame/sega/model2.cpp
++++ b/src/mame/sega/model2.cpp
+@@ -159,6 +159,21 @@
+ 
+ void model2_state::machine_start()
+ {
++    if(vcop2::vr_requested() && std::string_view(machine().system().name)=="vcop2") {
++        auto& space=m_maincpu->space(AS_PROGRAM);
++        space.install_write_tap(0x506044,0x506047,"vcop2_vr_camera_focus",
++            [this](offs_t, u32& data, u32 mask) {
++                data=vcop2::camera_write(vcop2::CameraFocusAddress,data,mask,
++                    [&](uint32_t address){return m_maincpu->space(AS_PROGRAM).read_dword(address);},
++                    vcop2::shared_runtime().camera_fov.load());
++            });
++        space.install_write_tap(0x506140,0x506143,"vcop2_vr_camera_tangent",
++            [this](offs_t, u32& data, u32 mask) {
++                data=vcop2::camera_write(vcop2::CameraTangentAddress,data,mask,
++                    [&](uint32_t address){return m_maincpu->space(AS_PROGRAM).read_dword(address);},
++                    vcop2::shared_runtime().camera_fov.load());
++            });
++    }
+ 	// initialize custom debugger pool, @see machine/model2.cpp
+ 	debug_init();
+ 
+--- a/src/mame/sega/model2_v.cpp
++++ b/src/mame/sega/model2_v.cpp
+@@ -2498,14 +2498,14 @@
+         capture.bytes("luma",m_lumaram.get(),0x8000);
+         capture.bytes("gamma",m_gamma_table,sizeof(m_gamma_table));
+         auto frame=std::make_unique<vcop2::NativeFrame>(capture.take());
+-        frame->complete=false;frame->raster_only=m_render_test_mode;
++        frame->complete=false;frame->raster_only=m_render_test_mode||vcop2::native_panel_requested();
+         vcop2::copy_pixels(frame->background,width,height,[&](int x,int y){return bitmap.pix(y,x);});
+         vcop2::live_raster()=std::move(frame);vcop2::live_pending()=false;
+     }
+ 	/* tell the rasterizer we're starting a frame */
+ 	if (m_render_test_mode == true)
+ 		draw_framebuffer(bitmap, cliprect);
+-	else if(!vcop2::vr_requested() || std::getenv("VCOP2_CPU_RASTER") || std::getenv("VCOP2_SCENE_DIR"))
++	else if(!vcop2::vr_requested() || std::getenv("VCOP2_CPU_RASTER") || std::getenv("VCOP2_SCENE_DIR") || vcop2::native_panel_requested())
+         // The VR host replays owned polygons. Retain the software rasterizer
+         // for reference diagnostics; it does not participate in game logic.
+ 		render_polygons(bitmap, cliprect);

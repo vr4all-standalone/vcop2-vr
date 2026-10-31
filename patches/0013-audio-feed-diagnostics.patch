@@ -1,0 +1,62 @@
+--- a/src/osd/modules/sound/sdl_sound.cpp
++++ b/src/osd/modules/sound/sdl_sound.cpp
+@@ -22,6 +22,7 @@
+ 
+ #include <algorithm>
+ #include <cmath>
++#include <cstdlib>
+ #include <fstream>
+ #include <memory>
+ #include <map>
+@@ -66,7 +67,12 @@
+ 		uint32_t m_id;
+ 		SDL_AudioDeviceID m_sdl_id;
+ 		abuffer m_buffer;
+-		stream_info(uint32_t id, uint8_t channels, uint32_t rate) : m_id(id), m_sdl_id(0), m_buffer(channels, rate) {}
++		bool m_diagnostics;
++		uint32_t m_rate;
++		uint64_t m_generated = 0, m_consumed = 0, m_missing = 0;
++		uint64_t m_report_ms, m_report_generated = 0, m_report_consumed = 0, m_report_missing = 0;
++		stream_info(uint32_t id, uint8_t channels, uint32_t rate) : m_id(id), m_sdl_id(0), m_buffer(channels, rate),
++			m_diagnostics(std::getenv("VCOP2_VR") != nullptr), m_rate(rate), m_report_ms(SDL_GetTicks64()) {}
+ 	};
+ 
+ 	std::vector<device_info> m_devices;
+@@ -236,14 +242,37 @@
+ 	if(si == m_streams.end())
+ 		return;
+ 	stream_info *stream = si->second.get();
++	const uint64_t now = stream->m_diagnostics ? SDL_GetTicks64() : 0;
++	const bool report = stream->m_diagnostics && now - stream->m_report_ms >= 5000;
++	uint64_t generated = 0, consumed = 0, missing = 0;
++	uint32_t queued = 0;
+ 	SDL_LockAudioDevice(stream->m_sdl_id);
+ 	stream->m_buffer.push(buffer, samples_this_frame);
++	if (stream->m_diagnostics) stream->m_generated += samples_this_frame;
++	if (report) {
++		generated = stream->m_generated; consumed = stream->m_consumed; missing = stream->m_missing;
++		queued = stream->m_buffer.available();
++	}
+ 	SDL_UnlockAudioDevice(stream->m_sdl_id);
++	if (report) {
++		double seconds = (now - stream->m_report_ms) / 1000.0;
++		osd_printf_info("VCOP2 audio: generated %.1f Hz, consumed %.1f Hz, missing %llu frames, queued %u, rate %u\n",
++			(generated-stream->m_report_generated)/seconds, (consumed-stream->m_report_consumed)/seconds,
++			static_cast<unsigned long long>(missing-stream->m_report_missing), queued, stream->m_rate);
++		stream->m_report_ms = now; stream->m_report_generated = generated;
++		stream->m_report_consumed = consumed; stream->m_report_missing = missing;
++	}
+ }
+ 
+ void sound_sdl::sink_callback(void *userdata, uint8_t *data, int len)
+ {
+ 	stream_info *stream = reinterpret_cast<stream_info *>(userdata);
++	if (stream->m_diagnostics) {
++		uint32_t needed = len / 2 / stream->m_buffer.channels();
++		uint32_t available = stream->m_buffer.available();
++		stream->m_consumed += needed;
++		if (needed > available) stream->m_missing += needed - available;
++	}
+ 	stream->m_buffer.get((int16_t *)data, len / 2 / stream->m_buffer.channels());
+ }
+ 

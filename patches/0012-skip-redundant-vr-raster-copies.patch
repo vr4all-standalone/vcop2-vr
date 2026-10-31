@@ -1,0 +1,14 @@
+--- a/src/mame/sega/model2_v.cpp
++++ b/src/mame/sega/model2_v.cpp
+@@ -2500,7 +2500,10 @@
+         auto frame=std::make_unique<vcop2::NativeFrame>(capture.take());
+         frame->complete=false;frame->raster_only=m_render_test_mode||vcop2::native_panel_requested();
+         vcop2::copy_pixels(frame->background,width,height,[&](int x,int y){return bitmap.pix(y,x);});
+-        if(!frame->raster_only && !frame->polygons.empty()) {
++        // The infinite sky mirrors the original visible 496px strip. The host
++        // pads that strip to 512px to preserve exact shader sampling, so this
++        // second tile render is needed only for full-period diagnostics.
++        if(std::getenv("VCOP2_CAPTURE_FULL_SKY_PERIOD") && !frame->raster_only && !frame->polygons.empty()) {
+             // System24's native 64x8 tile rows wrap at 512 pixels. Retain
+             // that full period rather than repeating a cropped 496px image.
+             frame->sky_width=512;frame->sky_height=height;

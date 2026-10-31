@@ -1,0 +1,20 @@
+--- a/src/mame/sega/model2_v.cpp
++++ b/src/mame/sega/model2_v.cpp
+@@ -2469,6 +2469,8 @@
+         // Raw pre-clipping polygons have been retained since geo_parse.
+         try {
+             auto& capture=vcop2::trace_capture();
++            const auto zoom=vcop2::read_native_camera_zoom([&](uint32_t address){return m_maincpu->space(AS_PROGRAM).read_dword(address);});
++            capture.camera_zoom(zoom.fov,zoom.reference_fov);
+             capture.display(m_crtc_xoffset,m_crtc_yoffset,m_screen->visible_area().width(),m_screen->visible_area().height());
+             capture.bytes("texture0",&m_textureram0[0],m_textureram0.bytes());
+             capture.bytes("texture1",&m_textureram1[0],m_textureram1.bytes());
+@@ -2487,6 +2489,8 @@
+     }
+     if(vcop2::live_pending()) {
+         auto& capture=vcop2::live_capture();
++        const auto zoom=vcop2::read_native_camera_zoom([&](uint32_t address){return m_maincpu->space(AS_PROGRAM).read_dword(address);});
++        capture.camera_zoom(zoom.fov,zoom.reference_fov);
+         const int width=m_screen->visible_area().width(),height=m_screen->visible_area().height();
+         capture.display(m_crtc_xoffset,m_crtc_yoffset,width,height);
+         {vcop2::NativeTimingScope blob_timing(vcop2::NativeSection::CaptureBlobs);

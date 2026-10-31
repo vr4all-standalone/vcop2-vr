@@ -1,0 +1,106 @@
+--- a/src/mame/sega/model2_v.cpp
++++ b/src/mame/sega/model2_v.cpp
+@@ -91,6 +91,7 @@
+ #include "emu.h"
+ #include "vcop2/native_timing.h"
+ #include "vcop2/native_clip.h"
++#include "vcop2/native_flash.h"
+ #include "model2.h"
+ #include "model2rd.ipp"
+ #include "../../lib/vcop2/model2_trace.h"
+@@ -2439,6 +2440,14 @@
+ u32 model2_state::screen_update(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect)
+ {
+     vcop2::NativeTimingScope native_timing(vcop2::NativeSection::ScreenUpdate);
++    // Hide only the verified original gun-reader's white window-selection
++    // mask. The emulated mask, gun-read cooldown, shots and reloads stay intact.
++    static const uint16_t clear_window_mask[0x800]{};
++    const uint16_t* window_mask_override=nullptr;
++    if (vcop2::vr_requested() && std::string_view(machine().system().name)=="vcop2" &&
++        !std::getenv("VCOP2_KEEP_GUN_STROBE") && vcop2::native_gun_strobe(
++            [&](uint32_t address){return m_maincpu->space(AS_PROGRAM).read_dword(address);}))
++        window_mask_override=clear_window_mask;
+ 	// if the scroll color table was written to, we need to refresh the palette
+ 	if (m_palette_dirty)
+ 	{
+@@ -2463,10 +2472,10 @@
+ 
+ 	// draw tilemap B as opaque
+ 	for (int layer = 3; layer >= 2; layer--)
+-		m_tiles->draw(screen, m_sys24_bitmap, cliprect, layer << 1, 0, TILEMAP_DRAW_OPAQUE);
++		m_tiles->draw_with_window_mask(screen, m_sys24_bitmap, cliprect, layer << 1, 0, TILEMAP_DRAW_OPAQUE, window_mask_override);
+ 
+ 	for (int layer = 1; layer >= 0; layer--)
+-		m_tiles->draw(screen, m_sys24_bitmap, cliprect, layer << 1, 0, 0);
++		m_tiles->draw_with_window_mask(screen, m_sys24_bitmap, cliprect, layer << 1, 0, 0, window_mask_override);
+ 
+ 	copybitmap_trans(bitmap, m_sys24_bitmap, 0, 0, 0, 0, cliprect, 0);
+     }
+@@ -2517,8 +2526,8 @@
+             bitmap_rgb32 sky(512,height);sky.fill(m_palette->pen(0));
+             const rectangle sky_clip(0,511,0,height-1);
+             for(int layer=3;layer>=2;--layer)
+-                m_tiles->draw_full_period(screen,sky,sky_clip,layer<<1,0,TILEMAP_DRAW_OPAQUE);
+-            for(int layer=1;layer>=0;--layer)m_tiles->draw_full_period(screen,sky,sky_clip,layer<<1,0,0);
++                m_tiles->draw_with_window_mask(screen,sky,sky_clip,layer<<1,0,TILEMAP_DRAW_OPAQUE,window_mask_override,true);
++            for(int layer=1;layer>=0;--layer)m_tiles->draw_with_window_mask(screen,sky,sky_clip,layer<<1,0,0,window_mask_override,true);
+             vcop2::copy_pixels(frame->sky,512,height,[&](int x,int y){return sky.pix(y,x);});
+         }
+         vcop2::live_raster()=std::move(frame);vcop2::live_pending()=false;
+@@ -2535,7 +2544,7 @@
+ 	m_sys24_bitmap.fill(0, cliprect);
+ 
+ 	for (int layer = 3; layer >= 0; layer--)
+-		m_tiles->draw(screen, m_sys24_bitmap, cliprect, (layer<<1) | 1, 0, 0);
++		m_tiles->draw_with_window_mask(screen, m_sys24_bitmap, cliprect, (layer<<1) | 1, 0, 0, window_mask_override);
+ 
+ 	copybitmap_trans(bitmap, m_sys24_bitmap, 0, 0, 0, 0, cliprect, 0);    }
+ 
+--- a/src/mame/sega/segaic24.h
++++ b/src/mame/sega/segaic24.h
+@@ -39,6 +39,7 @@
+ 	void draw(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect, int layer, int pri, int flags);
+ 	void draw(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect, int layer, int pri, int flags);
+ 	void draw_full_period(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect, int layer, int pri, int flags);
++	void draw_with_window_mask(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect, int layer, int pri, int flags, const uint16_t *mask_override, bool full_period = false);
+ 
+ 	auto xhout_write_callback() { return m_xhout_write_cb.bind(); }
+ 	auto xvout_write_callback() { return m_xvout_write_cb.bind(); }
+@@ -71,7 +72,7 @@
+ 					uint16_t tpri, uint8_t lpri, int flags, int win, int sx, int sy, int xx1, int yy1, int xx2, int yy2);
+ 
+ 	template<class BitmapClass>
+-	void draw_common(screen_device &screen, BitmapClass &bitmap, const rectangle &cliprect, int layer, int pri, int flags, bool full_period = false);
++	void draw_common(screen_device &screen, BitmapClass &bitmap, const rectangle &cliprect, int layer, int pri, int flags, bool full_period = false, const uint16_t *mask_override = nullptr);
+ 
+ 	devcb_write16 m_xhout_write_cb;
+ 	devcb_write16 m_xvout_write_cb;
+--- a/src/mame/sega/segaic24.cpp
++++ b/src/mame/sega/segaic24.cpp
+@@ -337,12 +337,12 @@
+ }
+ 
+ template<class BitmapClass>
+-void segas24_tile_device::draw_common(screen_device &screen, BitmapClass &bitmap, const rectangle &cliprect, int layer, int lpri, int flags, bool full_period)
++void segas24_tile_device::draw_common(screen_device &screen, BitmapClass &bitmap, const rectangle &cliprect, int layer, int lpri, int flags, bool full_period, const uint16_t *mask_override)
+ {
+ 	uint16_t hscr = tile_ram[0x5000+(layer >> 1)];
+ 	uint16_t vscr = tile_ram[0x5004+(layer >> 1)];
+ 	uint16_t ctrl = tile_ram[0x5004+((layer >> 1) & 2)];
+-	uint16_t *mask = tile_ram.get() + (layer & 4 ? 0x6800 : 0x6000);
++	const uint16_t *mask = mask_override && !(layer & 4) ? mask_override : tile_ram.get() + (layer & 4 ? 0x6800 : 0x6000);
+ 	uint16_t tpri = layer & 1;
+ 
+ 	lpri = 1 << lpri;
+@@ -522,6 +522,11 @@
+ 
+ void segas24_tile_device::draw_full_period(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect, int layer, int lpri, int flags)
+ { draw_common(screen, bitmap, cliprect, layer, lpri, flags, true); }
++
++// A caller may supply a render-only primary-pair window mask. Other pairs
++// keep their native masks, and the emulated tile RAM is never modified.
++void segas24_tile_device::draw_with_window_mask(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect, int layer, int lpri, int flags, const uint16_t *mask_override, bool full_period)
++{ draw_common(screen, bitmap, cliprect, layer, lpri, flags, full_period, mask_override); }
+ 
+ uint16_t segas24_tile_device::tile_r(offs_t offset)
+ {

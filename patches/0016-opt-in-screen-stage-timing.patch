@@ -1,0 +1,66 @@
+--- a/src/mame/sega/model2_v.cpp
++++ b/src/mame/sega/model2_v.cpp
+@@ -2443,6 +2443,7 @@
+ 	// if the scroll color table was written to, we need to refresh the palette
+ 	if (m_palette_dirty)
+ 	{
++        vcop2::NativeTimingScope palette_timing(vcop2::NativeSection::PaletteUpdate);
+ 		for (int i = 0; i < 0x1000; i++)
+ 		{
+ 			u16 palcolor = m_palram[i];
+@@ -2456,6 +2457,7 @@
+ 		}
+ 	}
+ 
++    {vcop2::NativeTimingScope background_timing(vcop2::NativeSection::BackgroundTiles);
+ 	//logerror("--- frame ---\n");
+ 	bitmap.fill(m_palette->pen(0), cliprect);
+ 	m_sys24_bitmap.fill(0, cliprect);
+@@ -2468,6 +2470,7 @@
+ 		m_tiles->draw(screen, m_sys24_bitmap, cliprect, layer << 1, 0, 0);
+ 
+ 	copybitmap_trans(bitmap, m_sys24_bitmap, 0, 0, 0, 0, cliprect, 0);
++    }
+ 
+     if(vcop2::trace_geometry_pending()) {
+         // Freeze resources at the actual native draw, after vblank IRQ writes.
+@@ -2494,15 +2497,17 @@
+         auto& capture=vcop2::live_capture();
+         const int width=m_screen->visible_area().width(),height=m_screen->visible_area().height();
+         capture.display(m_crtc_xoffset,m_crtc_yoffset,width,height);
++        {vcop2::NativeTimingScope blob_timing(vcop2::NativeSection::CaptureBlobs);
+         capture.bytes("texture0",&m_textureram0[0],m_textureram0.bytes());
+         capture.bytes("texture1",&m_textureram1[0],m_textureram1.bytes());
+         capture.bytes("palette",m_palram.get(),0x4000);
+         capture.bytes("colorxlat",m_colorxlat.get(),0xc000);
+         capture.bytes("luma",m_lumaram.get(),0x8000);
+         capture.bytes("gamma",m_gamma_table,sizeof(m_gamma_table));
++        }
+         auto frame=std::make_unique<vcop2::NativeFrame>(capture.take());
+         frame->complete=false;frame->raster_only=m_render_test_mode||vcop2::native_panel_requested();
+-        vcop2::copy_pixels(frame->background,width,height,[&](int x,int y){return bitmap.pix(y,x);});
++        {vcop2::NativeTimingScope raster_timing(vcop2::NativeSection::RasterCopies);vcop2::copy_pixels(frame->background,width,height,[&](int x,int y){return bitmap.pix(y,x);});}
+         // The infinite sky mirrors the original visible 496px strip. The host
+         // pads that strip to 512px to preserve exact shader sampling, so this
+         // second tile render is needed only for full-period diagnostics.
+@@ -2527,15 +2532,17 @@
+         // for reference diagnostics; it does not participate in game logic.
+ 		render_polygons(bitmap, cliprect);
+ 
++    {vcop2::NativeTimingScope foreground_timing(vcop2::NativeSection::ForegroundTiles);
+ 	m_sys24_bitmap.fill(0, cliprect);
+ 
+ 	for (int layer = 3; layer >= 0; layer--)
+ 		m_tiles->draw(screen, m_sys24_bitmap, cliprect, (layer<<1) | 1, 0, 0);
+ 
+-	copybitmap_trans(bitmap, m_sys24_bitmap, 0, 0, 0, 0, cliprect, 0);
++	copybitmap_trans(bitmap, m_sys24_bitmap, 0, 0, 0, 0, cliprect, 0);    }
++
+     if(auto& frame=vcop2::live_raster();frame) {
+-        vcop2::copy_pixels(frame->foreground,frame->width,frame->height,[&](int x,int y){return m_sys24_bitmap.pix(y,x);});
+-        vcop2::copy_pixels(frame->native,frame->width,frame->height,[&](int x,int y){return bitmap.pix(y,x);});
++        {vcop2::NativeTimingScope raster_timing(vcop2::NativeSection::RasterCopies);vcop2::copy_pixels(frame->foreground,frame->width,frame->height,[&](int x,int y){return m_sys24_bitmap.pix(y,x);});}
++        {vcop2::NativeTimingScope raster_timing(vcop2::NativeSection::RasterCopies);vcop2::copy_pixels(frame->native,frame->width,frame->height,[&](int x,int y){return bitmap.pix(y,x);});}
+         frame->complete=true;
+         vcop2::shared_runtime().scene.store(std::shared_ptr<const vcop2::NativeFrame>(frame.release()));
+     }

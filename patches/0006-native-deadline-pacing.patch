@@ -1,0 +1,72 @@
+--- a/src/emu/video.cpp
++++ b/src/emu/video.cpp
+@@ -26,11 +26,29 @@
+ #include "xmlfile.h"
+ 
+ #include "osdepend.h"
++#include "vcop2/realtime_pacer.h"
+ 
+ #include "rendersw.hxx"
+ 
+ #include <bit>
+ #include <cstdio>
++#include <chrono>
++#include <cstdlib>
++#include <thread>
++
++namespace {
++bool vr_deadline_pacing_enabled()
++{
++	static const bool enabled = std::getenv("VCOP2_VR") && !std::getenv("VCOP2_LEGACY_PACING");
++	return enabled;
++}
++
++vcop2::RealtimePacer &vr_deadline_pacer()
++{
++	static thread_local vcop2::RealtimePacer pacer;
++	return pacer;
++}
++}
+ 
+ 
+ //**************************************************************************
+@@ -236,6 +254,8 @@
+ 
+ 	// if we're throttling, synchronize before rendering
+ 	attotime current_time = machine().time();
++	if (vr_deadline_pacing_enabled() && !effective_throttle())
++		vr_deadline_pacer().reset();
+ 	if (!from_debugger && phase > machine_phase::INIT && !m_low_latency && effective_throttle())
+ 		update_throttle(current_time);
+ 
+@@ -662,6 +682,30 @@
+ 
+ void video_manager::update_throttle(attotime emutime)
+ {
++	if (vr_deadline_pacing_enabled())
++	{
++		auto &vr_pacer = vr_deadline_pacer();
++		if (machine().paused() || m_speed <= 0 || m_throttle_rate <= 0)
++			vr_pacer.reset();
++		else
++		{
++			// Model 2 renders expensive 3D updates between cheaper native
++			// refreshes. Keep their cumulative deadline rather than discarding
++			// each overrun, which needlessly starves real-time audio playback.
++			using clock = std::chrono::steady_clock;
++			auto now = clock::now();
++			double wall = std::chrono::duration<double>(now.time_since_epoch()).count();
++			double wait = vr_pacer.wait_seconds(emutime.as_double(), wall, (m_speed / 1000.0) * m_throttle_rate);
++			if (wait > 0)
++			{
++				auto deadline = now + std::chrono::duration_cast<clock::duration>(std::chrono::duration<double>(wait));
++				bool const allowed_to_sleep = machine().options().sleep() && (!effective_autoframeskip() || effective_frameskip() == 0);
++				if (allowed_to_sleep) std::this_thread::sleep_until(deadline);
++				else while (clock::now() < deadline) { }
++			}
++			return;
++		}
++	}
+ /*
+ 
+    Throttling theory:

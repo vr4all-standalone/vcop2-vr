@@ -5,7 +5,7 @@
 # Virtua Cop 2 VR
 ### Sega Model 2A Arcade Light-Gun Action · Standalone Meta Quest & PC VR
 
-[![Release v0.2.12](https://img.shields.io/badge/Release-v0.2.12-brightgreen?style=for-the-badge)](https://github.com/vr4all-standalone/vcop2-vr/releases/latest)
+[![Release v0.2.14](https://img.shields.io/badge/Release-v0.2.14-brightgreen?style=for-the-badge)](https://github.com/vr4all-standalone/vcop2-vr/releases/latest)
 [![Quest and PC VR](https://img.shields.io/badge/Headset-Quest_3_%2F_3S_%C2%B7_PC_VR_OpenXR-blue?style=for-the-badge)](#installation-meta-quest)
 [![Original arcade game required](https://img.shields.io/badge/Your_Game-vcop2%20%2B%20billboard%20firmware-orange?style=for-the-badge)](#your-game-files)
 
@@ -13,15 +13,16 @@
 
 [Checksums](https://github.com/vr4all-standalone/vcop2-vr/releases/latest/download/SHA256SUMS.txt) · [Complete source](https://github.com/vr4all-standalone/vcop2-vr/releases/latest/download/vcop2-vr-source.zip) · [All releases](https://github.com/vr4all-standalone/vcop2-vr/releases)
 
-**[🌐 VR4ALL — Standalone VR Mod Installer](https://github.com/vr4all-standalone/vr4all-standalone)**
-
-[☕ Donate to VR4ALL](https://ko-fi.com/vr4all)
+**[🌐 VR4ALL — Standalone VR Mod Installer](https://github.com/vr4all-standalone/vr4all-standalone)**  
+**[☕ Donate to VR4ALL](https://ko-fi.com/vr4all)**
 
 </div>
 
 ---
 
-## Update v0.2.12
+## Update v0.2.14
+
+- Defaults and Reset now match the captured Quest profile: Arcade, gun angle 0, Shoot off-screen reload, P1 left / P2 right, Laser On, and Custom reticle 20% minimum / 35% maximum / 7.0 m shrink. Existing valid preferences are preserved.
 
 - Shared wide VR4ALL setup panel, with validated automatic entry and manual Play.
 - Full player-colored Arcade body and grip, with original grey screws and lens details. P1 red / P2 blue follow player identity across hand swaps.
